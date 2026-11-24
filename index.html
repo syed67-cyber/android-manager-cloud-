@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#090d18"><title>Android Manager Cloud</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#090d18;--panel:#111a2b;--line:#24324a;--muted:#91a1ba;--cyan:#57d6e8;--blue:#657dff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 85% 0,#172a4b 0,transparent 35%),var(--bg);color:#f4f7ff;font:15px system-ui,Arial,sans-serif;min-height:100vh}
+.wrap{max-width:1080px;margin:auto;padding:26px 18px 60px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:28px}.brand{font-weight:800;font-size:20px;letter-spacing:.2px}.brand span{color:var(--cyan)}.pill{border:1px solid var(--line);padding:7px 11px;border-radius:99px;color:var(--muted);font-size:12px}
+h1{font-size:clamp(28px,5vw,42px);line-height:1.1;margin:10px 0}.sub{color:var(--muted);max-width:650px;line-height:1.6}.layout{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:26px}.panel,.stat,.feature{background:linear-gradient(145deg,#121e32,#0e1625);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 14px 40px #0003}
+.panel h2{margin:0 0 8px;font-size:20px}.muted{color:var(--muted);line-height:1.55}.tabs{display:flex;gap:8px;margin:18px 0}.tabs button,.btn{border:1px solid var(--line);background:#1a2940;color:#dfeaff;padding:11px 15px;border-radius:10px;font-weight:650;cursor:pointer}.tabs button.active,.btn.primary{background:linear-gradient(100deg,#536cff,#238eaa);border:0;color:white}
+label{display:block;font-size:13px;color:#b7c5da;margin:13px 0 6px}input{width:100%;padding:13px;border-radius:10px;border:1px solid #30415d;background:#091221;color:white;font-size:15px;outline:none}input:focus{border-color:var(--cyan)}.btn{width:100%;margin-top:14px}.msg{min-height:22px;margin-top:12px;color:var(--cyan);font-size:13px}.error{color:#ff9b9b}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}.stat{padding:16px}.stat strong{display:block;font-size:24px;margin-bottom:4px}.stat small{color:var(--muted)}
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.feature{padding:18px}.feature h3{margin:8px 0}.icon{font-size:23px}.hidden{display:none!important}.notice{margin-top:18px;border:1px solid #66512b;background:#2b2415;color:#e8d7a9;border-radius:12px;padding:13px;font-size:13px;line-height:1.5}
+.userbar{display:flex;align-items:center;gap:12px}.useremail{font-size:12px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:760px){.layout{grid-template-columns:1fr}.features{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}.wrap{padding:18px 14px}.panel{padding:18px}.top{align-items:flex-start}.pill{white-space:nowrap}}
+</style></head>
+<body><main class="wrap">
+<header class="top"><div class="brand">ANDROID <span>MANAGER</span> CLOUD</div><div id="status" class="pill">Secure cloud dashboard</div></header>
+<section><div class="pill">VIRTUAL DEVICE CONTROL PLATFORM</div><h1>Manage Android devices<br>from one dashboard.</h1><p class="sub">Sign in to access your workspace. Device streaming and per-device network routing will appear here after a cloud Android provider is connected.</p></section>
+<section id="authArea" class="layout">
+<div class="panel"><h2 id="formTitle">Welcome back</h2><p class="muted" id="formHint">Sign in or create your secure account.</p>
+<div class="tabs"><button id="loginTab" class="active" type="button">Sign in</button><button id="signupTab" type="button">Create account</button></div>
+<form id="authForm"><label for="email">Email address</label><input id="email" type="email" autocomplete="email" required placeholder="you@example.com"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" minlength="6" required placeholder="At least 6 characters"><button id="submitBtn" class="btn primary" type="submit">Sign in</button></form><div id="message" class="msg" role="status"></div>
+</div><div class="panel"><h2>Workspace access</h2><p class="muted">Your account is protected by Supabase Authentication. Each signed-in user gets their own session. Your password is sent directly to Supabase Auth over HTTPS and is never stored in this website's code.</p><div class="notice">If email confirmation is enabled in Supabase, create account will ask you to verify your email before signing in. “Account created” is shown only when Supabase returns a successful signup response.</div></div>
+</section>
+<section id="dashboard" class="hidden">
+<div class="panel"><div class="userbar"><div style="flex:1"><h2>Workspace overview</h2><p class="muted" id="welcome"></p></div><button id="logout" class="btn" style="width:auto;margin:0">Sign out</button></div>
+<div class="stats"><div class="stat"><strong>0</strong><small>Connected devices</small></div><div class="stat"><strong>—</strong><small>Live sessions</small></div><div class="stat"><strong>—</strong><small>Network profiles</small></div></div></div>
+<div class="features"><div class="feature"><div class="icon">📱</div><h3>Live Android screen</h3><p class="muted">Waiting for a cloud Android provider connection.</p></div><div class="feature"><div class="icon">🌐</div><h3>Separate IP network</h3><p class="muted">Per-device egress IP setup is not connected yet.</p></div><div class="feature"><div class="icon">🛠️</div><h3>Device manager</h3><p class="muted">Device provisioning will be enabled after backend integration.</p></div></div>
+<div class="notice">Authentication is connected. This starter dashboard does not create virtual Android devices or assign IP addresses yet; those require a cloud compute and network provider.</div>
+</section>
+</main>
+<script>
+const SUPABASE_URL='https://cbkkxzqaxnarvtasfnlo.supabase.co';
+const SUPABASE_KEY='sb_publishable_NVjPyx1CyDQ_7sRK7mmWvQ_z_S3jEYk';
+const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+let mode='login';
+const $=id=>document.getElementById(id);
+function showMessage(text,isError=false){$('message').textContent=text;$('message').className='msg'+(isError?' error':'')}
+function setMode(next){mode=next;$('loginTab').classList.toggle('active',mode==='login');$('signupTab').classList.toggle('active',mode==='signup');$('formTitle').textContent=mode==='login'?'Welcome back':'Create your account';$('formHint').textContent=mode==='login'?'Sign in to open your workspace.':'Use your email and create a password (minimum 6 characters).';$('submitBtn').textContent=mode==='login'?'Sign in':'Create account';$('password').autocomplete=mode==='login'?'current-password':'new-password';showMessage('')}
+$('loginTab').onclick=()=>setMode('login');$('signupTab').onclick=()=>setMode('signup');
+function render(session){const signedIn=!!session;$('authArea').classList.toggle('hidden',signedIn);$('dashboard').classList.toggle('hidden',!signedIn);$('status').textContent=signedIn?'Signed in securely':'Secure cloud dashboard';if(signedIn)$('welcome').textContent='Signed in as '+session.user.email+'. Your workspace is ready.'}
+$('authForm').addEventListener('submit',async e=>{e.preventDefault();const email=$('email').value.trim();const password=$('password').value;$('submitBtn').disabled=true;$('submitBtn').textContent='Please wait…';showMessage('');
+try{if(mode==='signup'){const {data,error}=await supabase.auth.signUp({email,password});if(error)throw error;if(data.session){render(data.session);showMessage('Account created and signed in.')}else{showMessage('Signup successful. Check your email for the confirmation link, then sign in.');setMode('login')}}else{const {data,error}=await supabase.auth.signInWithPassword({email,password});if(error)throw error;if(!data.session)throw new Error('Sign-in did not return a session. Please try again.');render(data.session)}}catch(err){showMessage(err.message||'Authentication failed. Please try again.',true)}finally{$('submitBtn').disabled=false;$('submitBtn').textContent=mode==='login'?'Sign in':'Create account'}});
+$('logout').onclick=async()=>{const {error}=await supabase.auth.signOut();if(error){alert(error.message);return}render(null);setMode('login')};
+supabase.auth.getSession().then(({data,error})=>{if(error)showMessage(error.message,true);render(data.session)});supabase.auth.onAuthStateChange((_event,session)=>render(session));
+</script></body></html>
