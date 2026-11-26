@@ -461,9 +461,34 @@ $('installApk').onclick=async()=>{
 
 async function loadDeviceProfile(){
   try{
+    const {data:{session}}=await supabaseClient.auth.getSession();
+    if(!session?.user?.id)return;
     const r=await supabaseClient.from('devices').select('id,display_name').eq('provider','emuly').eq('provider_device_id','phone-dapper-walrus').maybeSingle();
-    if(r.error)throw r.error;if(r.data)$('deviceName').value=r.data.display_name||'My Android Device';
-  }catch(e){$('profileStatus').textContent=e.message;}
+    if(r.error)throw r.error;
+    let device=r.data;
+    if(!device){
+      const created=await supabaseClient.from('devices').insert({
+        owner_id:session.user.id,display_name:'My Android Device',provider:'emuly',
+        provider_device_id:'phone-dapper-walrus',status:'running',region:'CentralIndia',
+        android_version:'Android 16',last_seen_at:new Date().toISOString()
+      }).select('id,display_name').single();
+      if(created.error)throw created.error;
+      device=created.data;
+    }
+    $('deviceName').value=device.display_name||'My Android Device';
+    const network=await supabaseClient.from('network_profiles').select('id').eq('device_id',device.id).maybeSingle();
+    if(network.error)throw network.error;
+    if(!network.data){
+      const createdNetwork=await supabaseClient.from('network_profiles').insert({
+        device_id:device.id,owner_id:session.user.id,network_mode:'default',
+        provider:'Emuly',region:'CentralIndia',assigned_ip:null,status:'not_configured',
+        config_metadata:{route:'direct',dedicated_ip:false,description:'Default Emuly egress; no dedicated IP configured.'},
+        updated_at:new Date().toISOString()
+      });
+      if(createdNetwork.error)throw createdNetwork.error;
+    }
+    $('profileStatus').textContent='Emuly device profile is ready.';
+  }catch(e){$('profileStatus').textContent=e.message||'Could not load device profile.';}
 }
 $('saveDeviceProfile').onclick=async()=>{
   try{
