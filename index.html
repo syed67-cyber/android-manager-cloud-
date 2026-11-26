@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#090d18">
-<title>Android Manager Cloud</title>
+<title>Android Manager Cloud</title><meta name="application-version" content="0.4.0">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{color-scheme:dark;--bg:#090d18;--panel:#111a2b;--line:#24324a;--muted:#91a1ba;--cyan:#57d6e8}
@@ -48,6 +48,10 @@ input:focus{border-color:var(--cyan)}
 .screen-frame{margin-top:15px;background:#05080e;border:1px solid var(--line);border-radius:14px;padding:8px;text-align:center}
 #emulyScreen{display:block;width:100%;height:auto;max-height:680px;object-fit:contain;border-radius:8px;cursor:crosshair;touch-action:none;user-select:none}
 .screen-help{font-size:12px;color:var(--muted);margin:8px 0}
+.app-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+.app-row:last-child{border:0}.small-btn{padding:7px 10px;margin:0;font-size:12px}
+.profile-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
+@media(max-width:560px){.profile-row{grid-template-columns:1fr}}
 .useremail{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 @media(max-width:760px){.layout,.features{grid-template-columns:1fr}.wrap{padding:18px 14px}.panel{padding:18px}.top{align-items:flex-start}.stats{grid-template-columns:repeat(3,1fr)}}
 </style>
@@ -137,6 +141,8 @@ input:focus{border-color:var(--cyan)}
     <div class="device-actions">
       <button id="refreshEmuly" class="btn primary" type="button">Refresh Screen</button>
       <button id="autoRefresh" class="btn" type="button">Auto refresh: OFF</button>
+      <button id="startEmuly" class="btn" type="button">Start Device</button>
+      <button id="stopEmuly" class="btn" type="button">Stop Device</button>
     </div>
   </div>
 
@@ -158,7 +164,29 @@ input:focus{border-color:var(--cyan)}
     <p class="muted">Text input sends characters to the Android device. Special symbols may not be supported.</p>
   </div>
 
-  <div class="notice">This panel uses screenshot refresh and ADB input commands for tap, swipe, Back and Home. It is not a continuous video stream; screen updates happen when refreshed or auto-refresh is enabled.</div>
+  <div class="connection">
+    <strong>Installed apps</strong>
+    <p class="muted">Install an APK, open an installed app, or uninstall an app.</p>
+    <input id="apkFile" type="file" accept=".apk,application/vnd.android.package-archive">
+    <button id="installApk" class="btn primary full" type="button">Install APK</button>
+    <button id="refreshApps" class="btn full" type="button">Refresh App List</button>
+    <div id="appList" class="muted">App list not loaded yet.</div>
+    <p id="appStatus" class="msg" role="status"></p>
+  </div>
+  <div class="connection">
+    <strong>Device profile</strong>
+    <p class="muted">Save a name for this connected Emuly device.</p>
+    <div class="profile-row"><div><label for="deviceName">Device name</label><input id="deviceName" maxlength="60" value="My Android Device"></div><button id="saveDeviceProfile" class="btn primary" type="button">Save</button></div>
+    <p id="profileStatus" class="msg" role="status"></p>
+  </div>
+  <div class="connection">
+    <strong>Network and IP</strong>
+    <p class="muted">Check the current route and public exit IP. A dedicated IP requires a configured proxy route.</p>
+    <div id="networkStatus" class="msg">Checking network route…</div>
+    <div class="device-actions"><button id="checkNetwork" class="btn" type="button">Check Public IP</button><button id="disconnectProxy" class="btn" type="button">Reset Proxy Route</button></div>
+    <p class="muted">A separate IP per device is not enabled until a proxy endpoint or local network tunnel is configured. No fake IP is assigned.</p>
+  </div>
+  <div class="notice">Android Manager Cloud v0.4.0 · Screenshot control, tap, swipe, Back, Home, APK install, app list, device profile and network status.</div>
 </section>
 
 </main>
@@ -212,6 +240,7 @@ function render(session){
   $('status').textContent=signedIn?'Signed in securely':'Secure cloud dashboard';
   if(signedIn){
     $('welcome').textContent='Signed in as '+session.user.email+'.';
+    loadDeviceProfile();
   }else{
     stopAutoRefresh();
     $('emulyManager').classList.add('hidden');
@@ -262,6 +291,9 @@ $('openEmuly').onclick=()=>{
   $('dashboard').classList.add('hidden');
   $('emulyManager').classList.remove('hidden');
   window.scrollTo({top:0,behavior:'smooth'});
+  loadDeviceStatus();
+  loadNetworkStatus();
+  loadApps();
   loadEmulyScreen();
 };
 
@@ -281,17 +313,13 @@ async function getAccessToken(){
   return token;
 }
 
-async function callEmuly(action,extra={}){
+async function callEmuly(action,extra={},options={}){
   const token=await getAccessToken();
-  const response=await fetch(SUPABASE_URL+'/functions/v1/emuly-device',{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'apikey':SUPABASE_KEY,
-      'Authorization':'Bearer '+token
-    },
-    body:JSON.stringify({action,...extra})
-  });
+  const headers={apikey:SUPABASE_KEY,Authorization:'Bearer '+token};
+  let body;
+  if(options.formData){body=options.formData;body.set('action',action);}
+  else{headers['Content-Type']='application/json';body=JSON.stringify({action,...extra});}
+  const response=await fetch(SUPABASE_URL+'/functions/v1/emuly-device',{method:'POST',headers,body});
 
   if(!response.ok){
     let detail='Request failed with HTTP '+response.status;
@@ -341,6 +369,117 @@ async function loadEmulyScreen(){
 }
 
 $('refreshEmuly').onclick=loadEmulyScreen;
+
+async function callEmulyJson(action,extra={},options={}){
+  const response=await callEmuly(action,extra,options);
+  const text=await response.text();
+  try{return JSON.parse(text);}catch(_){return {output:text};}
+}
+async function loadDeviceStatus(){
+  try{
+    const d=await callEmulyJson('deviceStatus');
+    const state=d.state||d.status||'unknown';
+    $('deviceStatus').textContent=state==='running'?(d.android_state||'Running'):state;
+    setEmulyStatus('Emuly device: '+state+(d.android_state?' · Android '+d.android_state:''));
+    $('startEmuly').disabled=state==='running'||state==='starting';
+    $('stopEmuly').disabled=state==='stopped'||state==='stopping';
+  }catch(e){$('deviceStatus').textContent='Unavailable';setEmulyStatus(e.message,true);}
+}
+async function startEmuly(){
+  try{
+    $('startEmuly').disabled=true;setEmulyStatus('Starting Android device…');
+    await callEmulyJson('start');
+    for(let i=0;i<30;i++){
+      await new Promise(r=>setTimeout(r,3000));
+      const d=await callEmulyJson('deviceStatus');
+      if(d.state==='running'&&d.android_state==='ready'){setEmulyStatus('Android ready. Loading screen…');await loadEmulyScreen();break;}
+      setEmulyStatus('Starting… '+(d.android_state||d.state||'waiting'));
+    }
+  }catch(e){setEmulyStatus(e.message||'Could not start device.',true);}
+  finally{await loadDeviceStatus();}
+}
+async function stopEmuly(){
+  try{stopAutoRefresh();$('stopEmuly').disabled=true;setEmulyStatus('Stopping device. Android data will be kept…');await callEmulyJson('stop');}
+  catch(e){setEmulyStatus(e.message||'Could not stop device.',true);}
+  finally{await loadDeviceStatus();}
+}
+$('startEmuly').onclick=startEmuly;$('stopEmuly').onclick=stopEmuly;
+
+async function loadApps(){
+  $('appList').textContent='Loading apps…';
+  try{
+    const d=await callEmulyJson('apps');
+    const apps=Array.isArray(d)?d:(d.apps||d.packages||d.items||[]);
+    $('appList').replaceChildren();
+    if(!apps.length){$('appList').textContent='No installed app list returned.';return;}
+    apps.forEach(app=>{
+      const pkg=typeof app==='string'?app:(app.packageId||app.package||app.id||'');
+      if(!pkg)return;
+      const row=document.createElement('div');row.className='app-row';
+      const label=document.createElement('span');label.textContent=app.label||app.name||pkg;label.title=pkg;
+      const controls=document.createElement('div');
+      const open=document.createElement('button');open.className='btn small-btn';open.textContent='Open';
+      open.onclick=async()=>{try{await callEmulyJson('openApp',{packageId:pkg});$('appStatus').textContent='Opened '+pkg;setTimeout(loadEmulyScreen,800);}catch(e){$('appStatus').textContent=e.message;}};
+      const remove=document.createElement('button');remove.className='btn small-btn';remove.textContent='Uninstall';
+      remove.onclick=async()=>{if(!confirm('Uninstall '+pkg+'?'))return;try{const r=await callEmulyJson('uninstallApp',{packageId:pkg});$('appStatus').textContent=r.stdout||r.output||'Uninstall command sent.';await loadApps();}catch(e){$('appStatus').textContent=e.message;}};
+      controls.append(open,remove);row.append(label,controls);$('appList').append(row);
+    });
+  }catch(e){$('appList').textContent=e.message||'Could not load apps.';}
+}
+$('refreshApps').onclick=loadApps;
+$('installApk').onclick=async()=>{
+  const file=$('apkFile').files?.[0];
+  if(!file){$('appStatus').textContent='Choose an APK file first.';return;}
+  if(!file.name.toLowerCase().endsWith('.apk')||file.size>100*1024*1024){$('appStatus').textContent='Choose an APK smaller than 100 MB.';return;}
+  try{
+    $('installApk').disabled=true;$('appStatus').textContent='Uploading APK securely…';
+    const form=new FormData();form.append('file',file,file.name);
+    const op=await callEmulyJson('appInstall',{}, {formData:form});
+    const id=op.operationId||op.id;
+    if(!id){$('appStatus').textContent='Upload complete: '+JSON.stringify(op);return;}
+    for(let i=0;i<45;i++){
+      await new Promise(r=>setTimeout(r,2000));
+      const s=await callEmulyJson('appInstallStatus',{operationId:id});
+      $('appStatus').textContent='Install: '+(s.stage||s.status||'working');
+      if(['succeeded','failed','cancelled','interrupted'].includes(s.stage)){
+        $('appStatus').textContent=s.stage==='succeeded'?'APK installed successfully.':'Install '+s.stage+': '+(s.message||'See device logs.');
+        if(s.stage==='succeeded')await loadApps();break;
+      }
+    }
+  }catch(e){$('appStatus').textContent=e.message||'APK install failed.';}
+  finally{$('installApk').disabled=false;$('apkFile').value='';}
+};
+
+async function loadDeviceProfile(){
+  try{
+    const r=await supabaseClient.from('devices').select('id,display_name').eq('provider','emuly').eq('provider_device_id','phone-dapper-walrus').maybeSingle();
+    if(r.error)throw r.error;if(r.data)$('deviceName').value=r.data.display_name||'My Android Device';
+  }catch(e){$('profileStatus').textContent=e.message;}
+}
+$('saveDeviceProfile').onclick=async()=>{
+  try{
+    const {data:{session}}=await supabaseClient.auth.getSession();if(!session?.user?.id)throw new Error('Please sign in again.');
+    const existing=await supabaseClient.from('devices').select('id').eq('provider','emuly').eq('provider_device_id','phone-dapper-walrus').maybeSingle();
+    if(existing.error)throw existing.error;
+    const record={owner_id:session.user.id,display_name:$('deviceName').value.trim()||'My Android Device',provider:'emuly',provider_device_id:'phone-dapper-walrus',status:'running',region:'CentralIndia',android_version:'Android 16',last_seen_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+    const r=existing.data?.id?await supabaseClient.from('devices').update(record).eq('id',existing.data.id):await supabaseClient.from('devices').insert(record);
+    if(r.error)throw r.error;$('profileStatus').textContent='Device profile saved.';
+  }catch(e){$('profileStatus').textContent=e.message||'Could not save profile.';}
+};
+async function loadNetworkStatus(){
+  try{const d=await callEmulyJson('proxyStatus');$('networkStatus').textContent='Route: '+(d.mode||'direct')+(d.laptop_connected===false?' · computer disconnected':'')+(d.dns?' · DNS: '+d.dns:'');}
+  catch(e){$('networkStatus').textContent='Network status unavailable: '+e.message;}
+}
+$('checkNetwork').onclick=async()=>{
+  $('networkStatus').textContent='Checking public exit IP…';
+  try{const d=await callEmulyJson('proxyCheck');$('networkStatus').textContent='Public exit IP: '+(d.exit_ip||d.ip||'Not returned')+' · Route: '+(d.mode||'current');}
+  catch(e){$('networkStatus').textContent=e.message||'Could not check public IP.';}
+};
+$('disconnectProxy').onclick=async()=>{
+  if(!confirm('Reset this device to its default Emuly network route?'))return;
+  try{await callEmulyJson('proxyOff');$('networkStatus').textContent='Proxy route reset.';await loadNetworkStatus();}
+  catch(e){$('networkStatus').textContent=e.message||'Could not reset route.';}
+}
 
 $('emulyScreen').addEventListener('pointerdown',e=>{
   if(e.button!==undefined&&e.button!==0)return;
