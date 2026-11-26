@@ -106,7 +106,7 @@ input:focus{border-color:var(--cyan)}
     </div>
     <div class="stats">
       <div class="stat"><strong>1</strong><small>Emuly device</small></div>
-      <div class="stat"><strong id="deviceStatus">Checking</strong><small>Device status</small></div>
+      <div class="stat"><strong id="deviceStatus">Disconnected</strong><small>Device status</small></div>
       <div class="stat"><strong>Emuly</strong><small>Provider</small></div>
     </div>
   </div>
@@ -209,6 +209,21 @@ let busy=false;
 let profileLoading=false;
 let pointerStart=null;
 let suppressNextTap=false;
+let actionBusy=false;
+let refreshTimeouts=new Set();
+
+function scheduleScreenRefresh(delay){
+  const timer=setTimeout(()=>{
+    refreshTimeouts.delete(timer);
+    if(!$('emulyManager').classList.contains('hidden'))loadEmulyScreen();
+  },delay);
+  refreshTimeouts.add(timer);
+}
+
+function clearScheduledRefreshes(){
+  refreshTimeouts.forEach(clearTimeout);
+  refreshTimeouts.clear();
+}
 
 function showMessage(text,isError=false){
   $('message').textContent=text;
@@ -242,8 +257,11 @@ function render(session){
   if(signedIn){
     $('welcome').textContent='Signed in as '+session.user.email+'.';
     loadDeviceProfile();
+    if($('deviceStatus').textContent==='Disconnected')$('deviceStatus').textContent='Checking';
   }else{
     stopAutoRefresh();
+    clearScheduledRefreshes();
+    $('deviceStatus').textContent='Disconnected';
     $('emulyManager').classList.add('hidden');
   }
 }
@@ -300,6 +318,7 @@ $('openEmuly').onclick=()=>{
 
 $('backDashboard').onclick=()=>{
   stopAutoRefresh();
+  clearScheduledRefreshes();
   $('emulyManager').classList.add('hidden');
   $('dashboard').classList.remove('hidden');
   window.scrollTo({top:0,behavior:'smooth'});
@@ -335,9 +354,14 @@ async function callEmuly(action,extra={},options={}){
 }
 
 async function sendAdb(args){
-  const response=await callEmuly('adb',{args},{idempotencyKey:crypto.randomUUID()});
-  const result=await response.text();
-  return result;
+  if(actionBusy)throw new Error('Another device command is still running. Please wait.');
+  actionBusy=true;
+  try{
+    const response=await callEmuly('adb',{args},{idempotencyKey:crypto.randomUUID()});
+    return await response.text();
+  }finally{
+    actionBusy=false;
+  }
 }
 
 async function loadEmulyScreen(){
@@ -349,6 +373,8 @@ async function loadEmulyScreen(){
   try{
     const response=await callEmuly('screenshot');
     const blob=await response.blob();
+
+    if($('emulyManager').classList.contains('hidden'))return;
 
     if(!blob.type.startsWith('image/')){
       throw new Error('Emuly did not return an image.');
@@ -362,8 +388,10 @@ async function loadEmulyScreen(){
     $('deviceStatus').textContent='Connected';
     setEmulyStatus('Screenshot loaded. Click the screen to tap.');
   }catch(err){
-    $('deviceStatus').textContent='Error';
-    setEmulyStatus(err.message||'Could not load Emuly screen.',true);
+    if(!$('emulyManager').classList.contains('hidden')){
+      $('deviceStatus').textContent='Error';
+      setEmulyStatus(err.message||'Could not load Emuly screen.',true);
+    }
   }finally{
     busy=false;
     $('refreshEmuly').disabled=false;
@@ -421,7 +449,7 @@ async function loadApps(){
       const label=document.createElement('span');label.textContent=app.label||app.name||pkg;label.title=pkg;
       const controls=document.createElement('div');
       const open=document.createElement('button');open.className='btn small-btn';open.textContent='Open';
-      open.onclick=async()=>{try{await callEmulyJson('openApp',{packageId:pkg});$('appStatus').textContent='Opened '+pkg;setTimeout(loadEmulyScreen,800);}catch(e){$('appStatus').textContent=e.message;}};
+      open.onclick=async()=>{try{await callEmulyJson('openApp',{packageId:pkg});$('appStatus').textContent='Opened '+pkg;scheduleScreenRefresh(800);}catch(e){$('appStatus').textContent=e.message;}};
       if(app.launchable){controls.append(open);}
       row.append(label,controls);$('appList').append(row);
     });
@@ -551,7 +579,7 @@ $('emulyScreen').addEventListener('pointerup',async e=>{
     setEmulyStatus('Sending swipe…');
     await sendAdb(['shell','input','swipe',String(from.x),String(from.y),String(to.x),String(to.y),'350']);
     setEmulyStatus('Swipe sent. Refreshing screen…');
-    setTimeout(loadEmulyScreen,700);
+    scheduleScreenRefresh(700);
   }catch(err){
     setEmulyStatus(err.message||'Swipe command failed.',true);
   }
@@ -566,16 +594,21 @@ $('emulyScreen').addEventListener('click',async e=>{
 
   const rect=img.getBoundingClientRect();
   const scale=Math.min(rect.width/img.naturalWidth,rect.height/img.naturalHeight);
-  const drawnWidth=img.naturalWidth*scale,drawnHeight=img.naturalHeight*scale;
-  const drawnLeft=rect.left+(rect.width-drawnWidth)/2,drawnTop=rect.top+(rect.height-drawnHeight)/2;
-  const x=Math.round((e.clientX-drawnLeft)/drawnWidth*img.naturalWidth);
-  const y=Math.round((e.clientY-drawnTop)/drawnHeight*img.naturalHeight);
+  const renderedWidth=img.naturalWidth*scale;
+  const renderedHeight=img.naturalHeight*scale;
+  const offsetX=(rect.width-renderedWidth)/2;
+  const offsetY=(rect.height-renderedHeight)/2;
+  const localX=e.clientX-rect.left-offsetX;
+  const localY=e.clientY-rect.top-offsetY;
+  if(localX<0||localY<0||localX>renderedWidth||localY>renderedHeight)return;
+  const x=Math.min(img.naturalWidth-1,Math.max(0,Math.round(localX/scale)));
+  const y=Math.min(img.naturalHeight-1,Math.max(0,Math.round(localY/scale)));
 
   try{
     setEmulyStatus('Sending tap: '+x+', '+y);
     await sendAdb(['shell','input','tap',String(x),String(y)]);
     setEmulyStatus('Tap sent. Refreshing screen…');
-    setTimeout(loadEmulyScreen,900);
+    scheduleScreenRefresh(900);
   }catch(err){
     setEmulyStatus(err.message||'Tap command failed.',true);
   }
@@ -586,7 +619,7 @@ $('backKey').onclick=async()=>{
     setEmulyStatus('Sending Back command…');
     await sendAdb(['shell','input','keyevent','4']);
     setEmulyStatus('Back command sent.');
-    setTimeout(loadEmulyScreen,700);
+    scheduleScreenRefresh(700);
   }catch(err){
     setEmulyStatus(err.message,true);
   }
@@ -597,7 +630,7 @@ $('homeKey').onclick=async()=>{
     setEmulyStatus('Sending Home command…');
     await sendAdb(['shell','input','keyevent','3']);
     setEmulyStatus('Home command sent.');
-    setTimeout(loadEmulyScreen,700);
+    scheduleScreenRefresh(700);
   }catch(err){
     setEmulyStatus(err.message,true);
   }
@@ -617,11 +650,11 @@ $('sendText').onclick=async()=>{
 
   try{
     $('sendText').disabled=true;
-    const adbText=value.replace(/ /g,'%s');
+    const adbText=value.replace(/%/g,'%25').replace(/ /g,'%s');
     await sendAdb(['shell','input','text',adbText]);
     $('androidText').value='';
     setEmulyStatus('Text command sent.');
-    setTimeout(loadEmulyScreen,700);
+    scheduleScreenRefresh(700);
   }catch(err){
     setEmulyStatus(err.message||'Could not send text.',true);
   }finally{
