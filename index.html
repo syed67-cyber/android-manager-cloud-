@@ -129,6 +129,13 @@ input:focus{border-color:var(--cyan)}
       <p class="muted">Device-wise inbox for SMS received on an authorized SIM. SIM/Android SMS bridge connection is required.</p>
       <button id="openSmsInbox" class="btn primary full" type="button">Open SMS Inbox</button>
     </div>
+
+    <div class="feature">
+      <div class="icon">🔐</div>
+      <h3>One-Time OTP Testing</h3>
+      <p class="muted">Generate a temporary test recipient and single-use OTP for your own app's QA flow. No real phone number or SMS is used.</p>
+      <button id="openOneTimeOtp" class="btn primary full" type="button">Open OTP Tester</button>
+    </div>
     <div class="feature">
       <div class="icon">📨</div>
       <h3>Test Email & OTP Inbox</h3>
@@ -156,6 +163,30 @@ input:focus{border-color:var(--cyan)}
     <p class="muted">No messages to show. This inbox will display messages only after an authorized Android SMS bridge or supported inbound-SMS provider is connected.</p>
   </div>
   <div class="notice">Important: this website cannot read Android SMS by itself. Real incoming SMS requires an Android companion app with the required SMS permissions and user consent, or a provider that explicitly supports inbound SMS to your own +91 number. No random number or fake OTP is generated here. Third-party verification may be blocked by those services.</div>
+</section>
+
+
+<section id="oneTimeOtpPanel" class="panel hidden" style="margin-top:18px">
+  <div class="userbar">
+    <div><h2>One-Time OTP Testing</h2><p class="muted">Local QA simulator for your own app only.</p></div>
+    <button id="closeOneTimeOtp" class="btn" type="button">Back</button>
+  </div>
+  <div class="connection">
+    <strong>Temporary test recipient</strong>
+    <div id="testRecipientId" class="msg">Not generated yet.</div>
+    <button id="generateTestRecipient" class="btn primary full" type="button">Generate Test Recipient</button>
+  </div>
+  <div class="connection">
+    <strong>Single-use OTP</strong>
+    <p class="muted">Generate a 6-digit test code. It expires in 5 minutes and can be verified only once.</p>
+    <button id="issueTestOtp" class="btn primary full" type="button" disabled>Generate One-Time OTP</button>
+    <div id="issuedTestOtp" class="notice hidden"></div>
+    <label for="verifyTestOtp">Enter OTP to verify</label>
+    <input id="verifyTestOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-digit test OTP">
+    <button id="verifyTestOtpBtn" class="btn full" type="button" disabled>Verify & Use OTP</button>
+    <p id="oneTimeOtpStatus" class="msg" role="status">Generate a test recipient to begin.</p>
+  </div>
+  <div class="notice">Testing simulator only: these are not real +91 mobile numbers and no SMS is sent or received. Use this only to test OTP screens and verification logic in an app you own or are authorized to test. For production, validate OTPs on your backend and never expose generated OTPs to clients.</div>
 </section>
 
 <section id="testInboxPanel" class="panel hidden" style="margin-top:18px">
@@ -497,6 +528,64 @@ async function openTestMessage(id){
   }catch(e){$('testMessageDetail').textContent=e.message||'Could not open message.';}
 }
 $('refreshTestInbox').onclick=refreshTestInbox;
+
+
+// Local one-time OTP QA simulator. Not connected to SMS or real phone numbers.
+let qaRecipient=null;
+let qaOtp=null;
+let qaOtpExpiresAt=0;
+let qaOtpUsed=false;
+function setQaOtpStatus(message,isError=false){
+  $('oneTimeOtpStatus').textContent=message;
+  $('oneTimeOtpStatus').className='msg'+(isError?' error':'');
+}
+function openQaOtpPanel(){
+  $('dashboard').classList.add('hidden');
+  $('oneTimeOtpPanel').classList.remove('hidden');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function closeQaOtpPanel(){
+  $('oneTimeOtpPanel').classList.add('hidden');
+  $('dashboard').classList.remove('hidden');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+$('openOneTimeOtp').onclick=openQaOtpPanel;
+$('closeOneTimeOtp').onclick=closeQaOtpPanel;
+$('generateTestRecipient').onclick=()=>{
+  const bytes=new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  qaRecipient='QA-TEST-'+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
+  qaOtp=null;qaOtpExpiresAt=0;qaOtpUsed=false;
+  $('testRecipientId').textContent=qaRecipient;
+  $('issueTestOtp').disabled=false;
+  $('issuedTestOtp').classList.add('hidden');
+  $('verifyTestOtp').value='';
+  $('verifyTestOtpBtn').disabled=true;
+  setQaOtpStatus('Test recipient created. Generate a one-time code.');
+};
+$('issueTestOtp').onclick=()=>{
+  if(!qaRecipient)return;
+  const bytes=new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  qaOtp=String(bytes[0]%1000000).padStart(6,'0');
+  qaOtpExpiresAt=Date.now()+5*60*1000;
+  qaOtpUsed=false;
+  $('issuedTestOtp').textContent='Test OTP: '+qaOtp+' · valid for 5 minutes · one use only';
+  $('issuedTestOtp').classList.remove('hidden');
+  $('verifyTestOtpBtn').disabled=false;
+  setQaOtpStatus('One-time test OTP generated. Use it in your own app QA flow.');
+};
+$('verifyTestOtpBtn').onclick=()=>{
+  const entered=$('verifyTestOtp').value.trim();
+  if(!qaRecipient||!qaOtp){setQaOtpStatus('Generate an OTP first.',true);return;}
+  if(qaOtpUsed){setQaOtpStatus('This OTP has already been used. Generate a new one.',true);return;}
+  if(Date.now()>qaOtpExpiresAt){qaOtp=null;$('verifyTestOtpBtn').disabled=true;setQaOtpStatus('OTP expired. Generate a new one.',true);return;}
+  if(!/^\\d{6}$/.test(entered)||entered!==qaOtp){setQaOtpStatus('Incorrect OTP. Try again.',true);return;}
+  qaOtpUsed=true;qaOtp=null;
+  $('verifyTestOtpBtn').disabled=true;
+  $('issuedTestOtp').textContent='OTP successfully verified and consumed. It cannot be reused.';
+  setQaOtpStatus('Verified successfully · OTP consumed · one-time use complete.');
+};
 
 $('openEmuly').onclick=()=>{
   $('dashboard').classList.add('hidden');
