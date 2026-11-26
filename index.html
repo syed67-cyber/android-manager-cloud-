@@ -432,7 +432,7 @@ async function openTestMessage(id){
   try{
     const msg=await mailTm('/messages/'+encodeURIComponent(id));
     const plain=[msg.subject,msg.text, ...(Array.isArray(msg.html)?msg.html:[])].join(' ').replace(/<[^>]*>/g,' ');
-    const match=plain.match(/(?:^|\\D)(\\d{4,8})(?:\\D|$)/);
+    const match=plain.match(/(?:^|\D)(\d{4,8})(?:\D|$)/);
     detectedOtp=match?match[1]:'';
     $('testMessageDetail').textContent='From: '+(msg.from?.address||'Unknown')+'\nSubject: '+(msg.subject||'(no subject)')+'\n\n'+(msg.text||msg.intro||'Message content unavailable.');
     $('testMessageDetail').style.whiteSpace='pre-wrap';
