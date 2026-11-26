@@ -432,11 +432,20 @@ $('installApk').onclick=async()=>{
   if(!file){$('appStatus').textContent='Choose an APK file first.';return;}
   if(!file.name.toLowerCase().endsWith('.apk')||file.size>100*1024*1024){$('appStatus').textContent='Choose an APK smaller than 100 MB.';return;}
   try{
-    $('installApk').disabled=true;$('appStatus').textContent='Uploading APK securely…';
-    const form=new FormData();form.append('file',file,file.name);
-    const op=await callEmulyJson('appInstall',{}, {formData:form});
-    const id=op.operationId||op.id;
-    if(!id){$('appStatus').textContent='Upload complete: '+JSON.stringify(op);return;}
+    $('installApk').disabled=true;$('appStatus').textContent='Preparing secure APK upload…';
+    const start=await callEmulyJson('appInstallStart',{filename:file.name,totalBytes:file.size});
+    const id=start.operationId||start.id;
+    if(!id)throw new Error(start.error||'Could not start APK upload.');
+    const chunkSize=4*1024*1024;
+    for(let offset=0;offset<file.size;offset+=chunkSize){
+      const chunk=file.slice(offset,Math.min(offset+chunkSize,file.size));
+      const form=new FormData();
+      form.append('operationId',id);form.append('offset',String(offset));form.append('file',chunk,file.name+'.part');
+      await callEmulyJson('appInstallChunk',{}, {formData:form});
+      $('appStatus').textContent='Uploading APK… '+Math.min(100,Math.round((offset+chunk.size)/file.size*100))+'%';
+    }
+    await callEmulyJson('appInstallComplete',{operationId:id});
+    $('appStatus').textContent='APK uploaded. Installing on Android…';
     for(let i=0;i<45;i++){
       await new Promise(r=>setTimeout(r,2000));
       const s=await callEmulyJson('appInstallStatus',{operationId:id});
