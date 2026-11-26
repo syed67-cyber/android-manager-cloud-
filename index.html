@@ -316,6 +316,7 @@ async function getAccessToken(){
 async function callEmuly(action,extra={},options={}){
   const token=await getAccessToken();
   const headers={apikey:SUPABASE_KEY,Authorization:'Bearer '+token};
+  if(options.idempotencyKey)headers['Idempotency-Key']=options.idempotencyKey;
   let body;
   if(options.formData){body=options.formData;body.set('action',action);}
   else{headers['Content-Type']='application/json';body=JSON.stringify({action,...extra});}
