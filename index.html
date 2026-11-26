@@ -206,6 +206,7 @@ let mode='login';
 let autoRefreshTimer=null;
 let currentScreenUrl=null;
 let busy=false;
+let profileLoading=false;
 let pointerStart=null;
 let suppressNextTap=false;
 
@@ -460,6 +461,8 @@ $('installApk').onclick=async()=>{
 };
 
 async function loadDeviceProfile(){
+  if(profileLoading)return;
+  profileLoading=true;
   try{
     const {data:{session}}=await supabaseClient.auth.getSession();
     if(!session?.user?.id)return;
@@ -489,6 +492,7 @@ async function loadDeviceProfile(){
     }
     $('profileStatus').textContent='Emuly device profile is ready.';
   }catch(e){$('profileStatus').textContent=e.message||'Could not load device profile.';}
+  finally{profileLoading=false;}
 }
 $('saveDeviceProfile').onclick=async()=>{
   try{
