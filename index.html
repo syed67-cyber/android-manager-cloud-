@@ -132,9 +132,9 @@ input:focus{border-color:var(--cyan)}
 
     <div class="feature">
       <div class="icon">🔐</div>
-      <h3>One-Time OTP Testing</h3>
-      <p class="muted">Generate a temporary test recipient and single-use OTP for your own app's QA flow. No real phone number or SMS is used.</p>
-      <button id="openOneTimeOtp" class="btn primary full" type="button">Open OTP Tester</button>
+      <h3>Real SMS Inbox</h3>
+      <p class="muted">Real +91 SMS receiving is not active yet. An authorised number provider and account are required.</p>
+      <button id="openOneTimeOtp" class="btn primary full" type="button">Open SMS Inbox</button>
     </div>
     <div class="feature">
       <div class="icon">📨</div>
@@ -168,29 +168,29 @@ input:focus{border-color:var(--cyan)}
 
 <section id="oneTimeOtpPanel" class="panel hidden" style="margin-top:18px">
   <div class="userbar">
-    <div><h2>One-Time OTP Testing</h2><p class="muted">Test mobile number and received OTP inbox for your own app QA.</p></div>
+    <div><h2>Real SMS Inbox</h2><p class="muted">Provider status: Not connected</p></div>
     <button id="closeOneTimeOtp" class="btn" type="button">Back</button>
   </div>
   <div class="connection">
-    <strong>Random test mobile number</strong>
-    <div id="testRecipientId" class="msg">No test number generated.</div>
-    <button id="generateTestRecipient" class="btn primary full" type="button">Generate Random Number</button>
-    <p class="muted">Demo-only number format. It is not a real +91 subscriber number and cannot receive carrier SMS.</p>
+    <strong>Real +91 mobile number</strong>
+    <div id="testRecipientId" class="msg">No real number provider connected.</div>
+    <button id="generateTestRecipient" class="btn primary full" type="button" disabled>Number unavailable</button>
+    <p class="muted">A real number can only be assigned by an authorised SMS provider or a SIM you control. Randomly generated digits cannot receive SMS.</p>
   </div>
   <div class="connection">
-    <strong>Send test OTP to Received box</strong>
-    <p class="muted">Simulate your own app sending a one-time OTP to this test recipient.</p>
-    <button id="issueTestOtp" class="btn primary full" type="button" disabled>Send Test OTP</button>
-    <p id="oneTimeOtpStatus" class="msg" role="status">Generate a test number to begin.</p>
+    <strong>Incoming SMS</strong>
+    <p class="muted">The inbox will show messages only after a real provider webhook is configured.</p>
+    <button id="issueTestOtp" class="btn primary full" type="button" disabled>Provider not connected</button>
+    <p id="oneTimeOtpStatus" class="msg" role="status">Real SMS receiving is not configured.</p>
   </div>
   <div class="connection">
-    <strong>Received OTP</strong>
-    <div id="receivedTestOtp" class="notice">Waiting for test OTP…</div>
-    <label for="verifyTestOtp">Enter OTP to verify</label>
-    <input id="verifyTestOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-digit OTP">
-    <button id="verifyTestOtpBtn" class="btn full" type="button" disabled>Verify & Use OTP</button>
+    <strong>Received messages</strong>
+    <div id="receivedTestOtp" class="notice">No incoming SMS. Connect an authorised provider to activate this inbox.</div>
+    <label for="verifyTestOtp">OTP verification</label>
+    <input id="verifyTestOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Unavailable until provider is connected" disabled>
+    <button id="verifyTestOtpBtn" class="btn full" type="button" disabled>Verification unavailable</button>
   </div>
-  <div class="notice">Testing simulator only: the generated number and received OTP are simulated inside this page. No real phone number or SMS is used. To receive actual SMS from your own app, its backend must send to a SIM/provider number and deliver the inbound message to a secure webhook. Never use this demo inbox for real accounts.</div>
+  <div class="notice">This inbox is inactive until a legitimate SMS provider or SIM you control is connected. We will not display fabricated phone numbers or pretend simulated codes are real SMS.</div>
 </section>
 
 <section id="testInboxPanel" class="panel hidden" style="margin-top:18px">
