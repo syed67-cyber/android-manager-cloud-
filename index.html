@@ -333,7 +333,7 @@ async function callEmuly(action,extra={},options={}){
 }
 
 async function sendAdb(args){
-  const response=await callEmuly('adb',{args});
+  const response=await callEmuly('adb',{args},{idempotencyKey:crypto.randomUUID()});
   const result=await response.text();
   return result;
 }
@@ -420,9 +420,8 @@ async function loadApps(){
       const controls=document.createElement('div');
       const open=document.createElement('button');open.className='btn small-btn';open.textContent='Open';
       open.onclick=async()=>{try{await callEmulyJson('openApp',{packageId:pkg});$('appStatus').textContent='Opened '+pkg;setTimeout(loadEmulyScreen,800);}catch(e){$('appStatus').textContent=e.message;}};
-      const remove=document.createElement('button');remove.className='btn small-btn';remove.textContent='Uninstall';
-      remove.onclick=async()=>{if(!confirm('Uninstall '+pkg+'?'))return;try{const r=await callEmulyJson('uninstallApp',{packageId:pkg});$('appStatus').textContent=r.stdout||r.output||'Uninstall command sent.';await loadApps();}catch(e){$('appStatus').textContent=e.message;}};
-      controls.append(open,remove);row.append(label,controls);$('appList').append(row);
+      if(app.launchable){controls.append(open);}
+      row.append(label,controls);$('appList').append(row);
     });
   }catch(e){$('appList').textContent=e.message||'Could not load apps.';}
 }
@@ -498,9 +497,12 @@ $('emulyScreen').addEventListener('pointerup',async e=>{
   const img=$('emulyScreen');
   if(!img.naturalWidth||!img.naturalHeight)return;
   const rect=img.getBoundingClientRect();
+  const scale=Math.min(rect.width/img.naturalWidth,rect.height/img.naturalHeight);
+  const drawnWidth=img.naturalWidth*scale,drawnHeight=img.naturalHeight*scale;
+  const drawnLeft=rect.left+(rect.width-drawnWidth)/2,drawnTop=rect.top+(rect.height-drawnHeight)/2;
   const toDevice=(clientX,clientY)=>({
-    x:Math.max(0,Math.min(img.naturalWidth-1,Math.round((clientX-rect.left)/rect.width*img.naturalWidth))),
-    y:Math.max(0,Math.min(img.naturalHeight-1,Math.round((clientY-rect.top)/rect.height*img.naturalHeight)))
+    x:Math.max(0,Math.min(img.naturalWidth-1,Math.round((clientX-drawnLeft)/drawnWidth*img.naturalWidth))),
+    y:Math.max(0,Math.min(img.naturalHeight-1,Math.round((clientY-drawnTop)/drawnHeight*img.naturalHeight)))
   });
   const from=toDevice(start.x,start.y);
   const to=toDevice(e.clientX,e.clientY);
@@ -524,8 +526,11 @@ $('emulyScreen').addEventListener('click',async e=>{
   if(!img.naturalWidth||!img.naturalHeight)return;
 
   const rect=img.getBoundingClientRect();
-  const x=Math.round((e.clientX-rect.left)/rect.width*img.naturalWidth);
-  const y=Math.round((e.clientY-rect.top)/rect.height*img.naturalHeight);
+  const scale=Math.min(rect.width/img.naturalWidth,rect.height/img.naturalHeight);
+  const drawnWidth=img.naturalWidth*scale,drawnHeight=img.naturalHeight*scale;
+  const drawnLeft=rect.left+(rect.width-drawnWidth)/2,drawnTop=rect.top+(rect.height-drawnHeight)/2;
+  const x=Math.round((e.clientX-drawnLeft)/drawnWidth*img.naturalWidth);
+  const y=Math.round((e.clientY-drawnTop)/drawnHeight*img.naturalHeight);
 
   try{
     setEmulyStatus('Sending tap: '+x+', '+y);
