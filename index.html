@@ -46,7 +46,7 @@ input:focus{border-color:var(--cyan)}
 .connection strong{display:block;margin-bottom:6px}
 .device-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .screen-frame{margin-top:15px;background:#05080e;border:1px solid var(--line);border-radius:14px;padding:8px;text-align:center}
-#emulyScreen{display:block;width:100%;height:auto;max-height:680px;object-fit:contain;border-radius:8px;cursor:crosshair}
+#emulyScreen{display:block;width:100%;height:auto;max-height:680px;object-fit:contain;border-radius:8px;cursor:crosshair;touch-action:none;user-select:none}
 .screen-help{font-size:12px;color:var(--muted);margin:8px 0}
 .useremail{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 @media(max-width:760px){.layout,.features{grid-template-columns:1fr}.wrap{padding:18px 14px}.panel{padding:18px}.top{align-items:flex-start}.stats{grid-template-columns:repeat(3,1fr)}}
@@ -143,7 +143,7 @@ input:focus{border-color:var(--cyan)}
   <div class="screen-frame">
     <img id="emulyScreen" class="hidden" alt="Emuly Android screen">
     <div id="screenPlaceholder" class="muted">Tap Refresh Screen to load your Android screen.</div>
-    <p class="screen-help">Screen par kisi jagah click karo to Android device par tap bheja jayega.</p>
+    <p class="screen-help">Screen par click = tap, aur mouse/finger drag = swipe up/down/left/right.</p>
   </div>
 
   <div class="connection">
@@ -158,7 +158,7 @@ input:focus{border-color:var(--cyan)}
     <p class="muted">Text input sends characters to the Android device. Special symbols may not be supported.</p>
   </div>
 
-  <div class="notice">This panel currently uses screenshot refresh and ADB input commands. It is not a continuous video stream. Screen updates happen when refreshed or auto-refresh is enabled.</div>
+  <div class="notice">This panel uses screenshot refresh and ADB input commands for tap, swipe, Back and Home. It is not a continuous video stream; screen updates happen when refreshed or auto-refresh is enabled.</div>
 </section>
 
 </main>
@@ -178,6 +178,8 @@ let mode='login';
 let autoRefreshTimer=null;
 let currentScreenUrl=null;
 let busy=false;
+let pointerStart=null;
+let suppressNextTap=false;
 
 function showMessage(text,isError=false){
   $('message').textContent=text;
@@ -340,7 +342,45 @@ async function loadEmulyScreen(){
 
 $('refreshEmuly').onclick=loadEmulyScreen;
 
+$('emulyScreen').addEventListener('pointerdown',e=>{
+  if(e.button!==undefined&&e.button!==0)return;
+  pointerStart={x:e.clientX,y:e.clientY,id:e.pointerId};
+  try{$('emulyScreen').setPointerCapture(e.pointerId);}catch(_){}
+});
+
+$('emulyScreen').addEventListener('pointerup',async e=>{
+  if(!pointerStart||pointerStart.id!==e.pointerId)return;
+  const start=pointerStart;
+  pointerStart=null;
+  const dx=e.clientX-start.x;
+  const dy=e.clientY-start.y;
+  if(Math.hypot(dx,dy)<14)return;
+
+  const img=$('emulyScreen');
+  if(!img.naturalWidth||!img.naturalHeight)return;
+  const rect=img.getBoundingClientRect();
+  const toDevice=(clientX,clientY)=>({
+    x:Math.max(0,Math.min(img.naturalWidth-1,Math.round((clientX-rect.left)/rect.width*img.naturalWidth))),
+    y:Math.max(0,Math.min(img.naturalHeight-1,Math.round((clientY-rect.top)/rect.height*img.naturalHeight)))
+  });
+  const from=toDevice(start.x,start.y);
+  const to=toDevice(e.clientX,e.clientY);
+  suppressNextTap=true;
+  setTimeout(()=>{suppressNextTap=false;},500);
+  try{
+    setEmulyStatus('Sending swipe…');
+    await sendAdb(['shell','input','swipe',String(from.x),String(from.y),String(to.x),String(to.y),'350']);
+    setEmulyStatus('Swipe sent. Refreshing screen…');
+    setTimeout(loadEmulyScreen,700);
+  }catch(err){
+    setEmulyStatus(err.message||'Swipe command failed.',true);
+  }
+});
+
+$('emulyScreen').addEventListener('pointercancel',()=>{pointerStart=null;});
+
 $('emulyScreen').addEventListener('click',async e=>{
+  if(suppressNextTap)return;
   const img=$('emulyScreen');
   if(!img.naturalWidth||!img.naturalHeight)return;
 
