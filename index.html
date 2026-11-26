@@ -986,5 +986,60 @@ if(supabaseClient){
   showMessage('Secure login service did not load. Check your internet connection.',true);
 }
 </script>
+<script>
+// Standalone fallback for the demo OTP controls. Kept separate from the main app script
+// so an unrelated app initialization error cannot disable this local QA demo.
+(()=>{
+  const byId=(id)=>document.getElementById(id);
+  const bind=()=>{
+    const open=byId('openOneTimeOtp'), close=byId('closeOneTimeOtp');
+    const panel=byId('oneTimeOtpPanel'), dashboard=byId('dashboard');
+    const generate=byId('generateTestRecipient'), send=byId('issueTestOtp');
+    const verify=byId('verifyTestOtpBtn');
+    if(open) open.addEventListener('click',()=>{
+      if(dashboard) dashboard.classList.add('hidden');
+      if(panel) panel.classList.remove('hidden');
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+    if(close) close.addEventListener('click',()=>{
+      if(panel) panel.classList.add('hidden');
+      if(dashboard) dashboard.classList.remove('hidden');
+    });
+    let recipient=null, code=null, expires=0, used=false;
+    const status=(message)=>{const el=byId('oneTimeOtpStatus');if(el)el.textContent=message;};
+    if(generate) generate.addEventListener('click',()=>{
+      const digits=String(Math.floor(Math.random()*100000000)).padStart(8,'0');
+      recipient='+91 00000 '+digits.slice(-4);
+      code=null;expires=0;used=false;
+      const number=byId('testRecipientId');if(number)number.textContent=recipient+' (DEMO ONLY)';
+      if(send)send.disabled=false;
+      const inbox=byId('receivedTestOtp');if(inbox)inbox.textContent='Waiting for test OTP…';
+      const input=byId('verifyTestOtp');if(input)input.value='';
+      if(verify)verify.disabled=true;
+      status('Demo number generated. Tap Send Test OTP.');
+    });
+    if(send) send.addEventListener('click',()=>{
+      if(!recipient){status('Generate a test number first.');return;}
+      code=String(Math.floor(Math.random()*1000000)).padStart(6,'0');
+      expires=Date.now()+300000;used=false;
+      const inbox=byId('receivedTestOtp');
+      if(inbox)inbox.textContent='Received test OTP: '+code+' · '+new Date().toLocaleTimeString()+' · expires in 5 minutes';
+      if(verify)verify.disabled=false;
+      status('Simulated OTP delivered to Received box. No SMS was sent.');
+    });
+    if(verify) verify.addEventListener('click',()=>{
+      const input=byId('verifyTestOtp');
+      if(!code||used){status('Generate a new test OTP first.');return;}
+      if(Date.now()>expires){code=null;verify.disabled=true;status('OTP expired. Generate a new one.');return;}
+      if(!input||input.value.trim()!==code){status('Incorrect OTP. Try again.');return;}
+      used=true;code=null;verify.disabled=true;
+      const inbox=byId('receivedTestOtp');if(inbox)inbox.textContent='OTP verified and consumed. It cannot be reused.';
+      status('Verified successfully · one-time use complete.');
+    });
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});
+  else bind();
+})();
+</script>
 </body>
 </html>
