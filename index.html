@@ -156,7 +156,7 @@ input:focus{border-color:var(--cyan)}
     <div id="testInboxMessages" class="muted">No messages yet.</div>
     <div id="testMessageDetail" class="muted"></div>
   </div>
-  <p class="muted">Powered by <a href="https://mail.tm/" target="_blank" rel="noopener noreferrer">mail.tm</a>. Free third-party temporary email; some services block disposable domains. Use only for your own app testing, not sensitive or personal accounts. Inbox credentials stay in this browser tab and are lost when it is closed.</p>
+  <p class="muted">Powered by <a href="https://www.1secmail.com/" target="_blank" rel="noopener noreferrer">1secmail</a>. Free public temporary email; anyone who knows the address may be able to read messages. Use only for app testing, never for personal or sensitive accounts.</p>
 </section>
 
 <section id="emulyManager" class="panel hidden" style="margin-top:18px">
@@ -339,7 +339,7 @@ $('authForm').addEventListener('submit',async e=>{
   }
 });
 
-// Temporary test inbox integration (mail.tm). Credentials remain in memory only.
+// Temporary test inbox integration (1secmail). Mailbox is public to anyone who knows its address.
 let testMailbox=null;
 let detectedOtp='';
 function setTestInboxStatus(message,isError=false){
@@ -358,7 +358,7 @@ async function mailTm(path,options={}){
   try{
     response=await fetch('/api/mail'+path,{...options,headers});
   }catch(err){
-    throw new Error('Mail service network/CORS error. Phone browser could not reach api.mail.tm. Check internet and try again.');
+    throw new Error('Mail service network/CORS error. Could not reach the temporary mail provider. Check internet and try again.');
   }
   if(!response.ok){
     let detail='Mail service error (HTTP '+response.status+').';
@@ -394,9 +394,9 @@ $('generateTestEmail').onclick=async()=>{
   try{
     const domainData=await mailTm('/domains');
     const domains=(domainData['hydra:member']||[]).filter(d=>d.isActive===true&&typeof d.domain==='string'&&d.domain.length>0);
-    if(!domains.length)throw new Error('Mail.tm returned no active domains. The free provider may be temporarily unavailable; try again later.');
+    if(!domains.length)throw new Error('Temporary mail provider returned no active domains. The free provider may be temporarily unavailable; try again later.');
     const publicDomains=domains.filter(d=>d.isPrivate!==true);
-    if(!publicDomains.length)throw new Error('Mail.tm has no public email domains available right now. Try again later.');
+    if(!publicDomains.length)throw new Error('Temporary mail provider has no public email domains available right now. Try again later.');
     const address=randomMailboxPart()+'@'+publicDomains[Math.floor(Math.random()*publicDomains.length)].domain;
     const password=randomMailboxPart()+'A9!';
     await mailTm('/accounts',{method:'POST',body:JSON.stringify({address,password})});
