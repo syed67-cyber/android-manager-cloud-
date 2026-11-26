@@ -156,7 +156,7 @@ input:focus{border-color:var(--cyan)}
     <div id="testInboxMessages" class="muted">No messages yet.</div>
     <div id="testMessageDetail" class="muted"></div>
   </div>
-  <p class="muted">Powered by <a href="https://www.1secmail.com/" target="_blank" rel="noopener noreferrer">1secmail</a>. Free public temporary email; anyone who knows the address may be able to read messages. Use only for app testing, never for personal or sensitive accounts.</p>
+  <p class="muted">Powered by <a href="https://www.guerrillamail.com/" target="_blank" rel="noopener noreferrer">Guerrilla Mail</a>. Free public temporary email; messages expire and anyone with access to the mailbox may be able to read them. Use only for app testing, never for personal or sensitive accounts.</p>
 </section>
 
 <section id="emulyManager" class="panel hidden" style="margin-top:18px">
@@ -339,7 +339,7 @@ $('authForm').addEventListener('submit',async e=>{
   }
 });
 
-// Temporary test inbox integration (1secmail). Mailbox is public to anyone who knows its address.
+// Temporary test inbox integration (Guerrilla Mail). Mailbox is public to anyone who knows its address.
 let testMailbox=null;
 let detectedOtp='';
 function setTestInboxStatus(message,isError=false){
@@ -392,17 +392,10 @@ $('generateTestEmail').onclick=async()=>{
   $('testOtpResult').classList.add('hidden');
   $('copyTestEmail').disabled=true;$('refreshTestInbox').disabled=true;$('copyDetectedOtp').disabled=true;
   try{
-    const domainData=await mailTm('/domains');
-    const domains=(domainData['hydra:member']||[]).filter(d=>d.isActive===true&&typeof d.domain==='string'&&d.domain.length>0);
-    if(!domains.length)throw new Error('Temporary mail provider returned no active domains. The free provider may be temporarily unavailable; try again later.');
-    const publicDomains=domains.filter(d=>d.isPrivate!==true);
-    if(!publicDomains.length)throw new Error('Temporary mail provider has no public email domains available right now. Try again later.');
-    const address=randomMailboxPart()+'@'+publicDomains[Math.floor(Math.random()*publicDomains.length)].domain;
-    const password=randomMailboxPart()+'A9!';
-    await mailTm('/accounts',{method:'POST',body:JSON.stringify({address,password})});
-    const auth=await mailTm('/token',{method:'POST',body:JSON.stringify({address,password})});
-    if(!auth.token)throw new Error('Inbox was created, but login token was not returned.');
-    testMailbox={address,password,token:auth.token};
+    const auth=await mailTm('/token',{method:'POST',body:JSON.stringify({})});
+    if(!auth.token||!auth.email_addr)throw new Error('Mail provider did not return an email address and session token.');
+    const address=auth.email_addr;
+    testMailbox={address,token:auth.token};
     $('testEmailAddress').textContent=address;
     $('copyTestEmail').disabled=false;$('refreshTestInbox').disabled=false;
     setTestInboxStatus('Inbox ready. Use this address in your own app signup test.');
