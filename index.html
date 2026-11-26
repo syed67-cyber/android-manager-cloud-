@@ -356,7 +356,7 @@ async function mailTm(path,options={}){
   if(options.body)headers['Content-Type']='application/json';
   let response;
   try{
-    response=await fetch('https://api.mail.tm'+path,{...options,headers});
+    response=await fetch('/api/mail'+path,{...options,headers});
   }catch(err){
     throw new Error('Mail service network/CORS error. Phone browser could not reach api.mail.tm. Check internet and try again.');
   }
