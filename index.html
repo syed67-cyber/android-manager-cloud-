@@ -124,12 +124,38 @@ input:focus{border-color:var(--cyan)}
       <p class="muted">Separate IP configuration is not connected yet. It will be added after network support is configured.</p>
     </div>
     <div class="feature">
+      <div class="icon">📲</div>
+      <h3>SMS & OTP Inbox</h3>
+      <p class="muted">Device-wise inbox for SMS received on an authorized SIM. SIM/Android SMS bridge connection is required.</p>
+      <button id="openSmsInbox" class="btn primary full" type="button">Open SMS Inbox</button>
+    </div>
+    <div class="feature">
       <div class="icon">📨</div>
       <h3>Test Email & OTP Inbox</h3>
       <p class="muted">Create a free temporary inbox for testing signup and email OTP flows in your own app.</p>
       <button id="openTestInbox" class="btn primary full" type="button">Open Test Inbox</button>
     </div>
   </div>
+</section>
+
+<section id="smsInboxPanel" class="panel hidden" style="margin-top:18px">
+  <div class="userbar">
+    <div><h2>SMS & OTP Inbox</h2><p class="muted">Incoming SMS for your authorized SIM, separated by Android device.</p></div>
+    <button id="closeSmsInbox" class="btn" type="button">Back</button>
+  </div>
+  <div class="connection">
+    <strong>Selected device</strong>
+    <div class="msg">phone-dapper-walrus · Android device</div>
+    <label for="smsNumberLabel">Your SIM number (label only)</label>
+    <input id="smsNumberLabel" type="tel" inputmode="tel" maxlength="16" placeholder="+91XXXXXXXXXX">
+    <button id="saveSmsNumberLabel" class="btn" type="button">Save number label</button>
+    <p id="smsInboxStatus" class="msg" role="status">Not connected · No SMS are being received.</p>
+  </div>
+  <div class="connection">
+    <strong>Received SMS</strong>
+    <p class="muted">No messages to show. This inbox will display messages only after an authorized Android SMS bridge or supported inbound-SMS provider is connected.</p>
+  </div>
+  <div class="notice">Important: this website cannot read Android SMS by itself. Real incoming SMS requires an Android companion app with the required SMS permissions and user consent, or a provider that explicitly supports inbound SMS to your own +91 number. No random number or fake OTP is generated here. Third-party verification may be blocked by those services.</div>
 </section>
 
 <section id="testInboxPanel" class="panel hidden" style="margin-top:18px">
@@ -374,6 +400,28 @@ async function mailTm(path,options={}){
   if(response.status===204)return null;
   return response.json();
 }
+$('openSmsInbox').onclick=()=>{
+  $('dashboard').classList.add('hidden');
+  $('smsInboxPanel').classList.remove('hidden');
+  window.scrollTo({top:0,behavior:'smooth'});
+};
+$('closeSmsInbox').onclick=()=>{
+  $('smsInboxPanel').classList.add('hidden');
+  $('dashboard').classList.remove('hidden');
+};
+$('saveSmsNumberLabel').onclick=()=>{
+  const value=$('smsNumberLabel').value.trim();
+  if(value && !/^\+?[0-9\s-]{8,16}$/.test(value)){
+    $('smsInboxStatus').textContent='Enter a valid phone number label.';
+    $('smsInboxStatus').className='msg error';
+    return;
+  }
+  $('smsInboxStatus').textContent=value
+    ? 'Number label saved in this page only. SMS bridge is not connected.'
+    : 'Enter your own SIM number label first.';
+  $('smsInboxStatus').className='msg';
+};
+
 $('openTestInbox').onclick=()=>{
   $('dashboard').classList.add('hidden');
   $('testInboxPanel').classList.remove('hidden');
