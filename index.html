@@ -735,7 +735,23 @@ async function loadApps(){
       const controls=document.createElement('div');
       const open=document.createElement('button');open.className='btn small-btn';open.textContent='Open';
       open.onclick=async()=>{try{await callEmulyJson('openApp',{packageId:pkg});$('appStatus').textContent='Opened '+pkg;scheduleScreenRefresh(800);}catch(e){$('appStatus').textContent=e.message;}};
-      if(app.launchable){controls.append(open);}
+      const reset=document.createElement('button');reset.className='btn small-btn';reset.textContent='Clear Data + Relaunch';
+      reset.title='Clear this app’s local data and settings, then reopen it';
+      reset.onclick=async()=>{
+        if(!confirm('Clear all local data and settings for '+pkg+'? This cannot be undone.'))return;
+        reset.disabled=true;
+        try{
+          $('appStatus').textContent='Clearing app data for '+pkg+'…';
+          const output=await sendAdb(['shell','pm','clear',pkg]);
+          if(!/Success/i.test(output))throw new Error(output.trim()||'Android did not confirm that app data was cleared.');
+          $('appStatus').textContent='App data cleared. Relaunching '+pkg+'…';
+          if(app.launchable){await callEmulyJson('openApp',{packageId:pkg});scheduleScreenRefresh(900);$('appStatus').textContent='App data cleared and app relaunched: '+pkg;}
+          else{$('appStatus').textContent='App data cleared for '+pkg+'. It is not marked launchable, so open it manually.';}
+        }catch(e){$('appStatus').textContent=e.message||'Could not clear app data.';}
+        finally{reset.disabled=false;}
+      };
+      if(app.launchable)controls.append(open);
+      controls.append(reset);
       row.append(label,controls);$('appList').append(row);
     });
   }catch(e){$('appList').textContent=e.message||'Could not load apps.';}
